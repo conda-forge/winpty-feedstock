@@ -7,11 +7,15 @@ package:
   version: {{ version }}
 
 source:
-  fn: {{ name }}-{{ version }}.tar.gz
-  url: https://github.com/rprichard/{{ name }}/archive/{{ version }}.tar.gz
-  sha256: {{ hash }}
-  patches:
-     - 0001-disable-msys-compiler-check.patch
+  - fn: {{ name }}-{{ version }}.tar.gz
+    url: https://github.com/rprichard/{{ name }}/archive/{{ version }}.tar.gz
+    sha256: {{ hash }}
+    patches:
+      - 0001-disable-msys-compiler-check.patch
+  # Use upstream's MSVC/GYP build for ARM64. gyp-next is a build-only tool.
+  - url: https://github.com/nodejs/gyp-next/archive/refs/tags/v0.22.2.tar.gz  # [target_platform == "win-arm64"]
+    sha256: eec4d9ca36028a28bffa6313fb7db51d664f06f49387cb734369777a55730d4d  # [target_platform == "win-arm64"]
+    folder: gyp-next  # [target_platform == "win-arm64"]
 
 build:
   number: 4
@@ -19,12 +23,27 @@ build:
 
 requirements:
   build:
-    - posix
-    - m2w64-toolchain
+    - posix  # [target_platform != "win-arm64"]
+    - m2w64-toolchain  # [target_platform != "win-arm64"]
+    - {{ compiler('cxx') }}  # [target_platform == "win-arm64"]
+    - {{ stdlib('c') }}  # [target_platform == "win-arm64"]
+    - python >=3.9  # [target_platform == "win-arm64"]
+    - packaging >=24  # [target_platform == "win-arm64"]
+    - setuptools >=77.0.3  # [target_platform == "win-arm64"]
 
 test:
+  requires:
+    - {{ compiler('cxx') }}  # [target_platform == "win-arm64"]
+  files:
+    - test_winpty.c  # [target_platform == "win-arm64"]
   commands:
     - winpty-agent --version
+    - call %CXX% /nologo /MD /W4 /I"%LIBRARY_INC%" test_winpty.c /link /LIBPATH:"%LIBRARY_LIB%" winpty.lib /OUT:winpty-consumer.exe  # [target_platform == "win-arm64"]
+    - dumpbin /imports winpty-consumer.exe | findstr /I /C:"winpty.dll"  # [target_platform == "win-arm64"]
+    - winpty-consumer.exe  # [target_platform == "win-arm64"]
+    - dumpbin /headers winpty-consumer.exe | findstr /I /C:"AA64 machine (ARM64)"  # [target_platform == "win-arm64"]
+    - dumpbin /headers "%LIBRARY_BIN%\winpty.dll" | findstr /I /C:"AA64 machine (ARM64)"  # [target_platform == "win-arm64"]
+    - dumpbin /headers "%LIBRARY_BIN%\winpty-agent.exe" | findstr /I /C:"AA64 machine (ARM64)"  # [target_platform == "win-arm64"]
 
 about:
   home: https://github.com/rprichard/winpty
