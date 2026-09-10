@@ -18,7 +18,7 @@ source:
     folder: gyp-next  # [target_platform == "win-arm64"]
 
 build:
-  number: 4
+  number: 5
   skip: True  # [not win]
 
 requirements:
